@@ -1,0 +1,1062 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Recibo de Sueldo · Dto. 407/2026</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Serif+Display&family=DM+Sans:ital,wght@0,300;0,400;0,500;0,600;1,400&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+<script>
+firebase.initializeApp({
+  apiKey: "AIzaSyArpPGYLyaBrq-nvS1eUe2kKf3qX3eyDM8",
+  authDomain: "recibo-sueldo.firebaseapp.com",
+  projectId: "recibo-sueldo",
+  storageBucket: "recibo-sueldo.firebasestorage.app",
+  messagingSenderId: "730997020890",
+  appId: "1:730997020890:web:526d9d0501107d3d85ede3"
+});
+const auth = firebase.auth();
+const db   = firebase.firestore();
+let currentUser = null;
+let userDoc = null;
+
+// Login con Google
+function loginGoogle() {
+  const provider = new firebase.auth.GoogleAuthProvider();
+  auth.signInWithPopup(provider).catch(e => alert('Error al iniciar sesión: ' + e.message));
+}
+function logout() {
+  auth.signOut();
+}
+
+// Observer de sesión
+auth.onAuthStateChanged(user => {
+  if (user) {
+    currentUser = user;
+    userDoc = db.collection('usuarios').doc(user.uid).collection('data').doc('recibo_db');
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appScreen').style.display  = 'grid';
+    document.getElementById('userInfo').textContent = user.displayName || user.email;
+    document.getElementById('userAvatar').src = user.photoURL || '';
+    loadDB();
+  } else {
+    currentUser = null;
+    userDoc = null;
+    document.getElementById('loginScreen').style.display = 'flex';
+    document.getElementById('appScreen').style.display  = 'none';
+  }
+});
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+<style>
+/* LOGIN SCREEN */
+#loginScreen{
+  display:flex;align-items:center;justify-content:center;
+  min-height:100vh;background:#0f1923;
+}
+.login-box{
+  background:#162230;border:1px solid #243444;border-radius:14px;
+  padding:40px 36px;text-align:center;max-width:360px;width:100%;
+}
+.login-logo{
+  width:56px;height:56px;background:var(--accent);border-radius:12px;
+  display:flex;align-items:center;justify-content:center;
+  font-family:'DM Serif Display',serif;font-size:22px;color:#fff;
+  margin:0 auto 16px;
+}
+.login-title{font-family:'DM Serif Display',serif;font-size:22px;color:var(--paper);margin-bottom:6px;}
+.login-sub{font-size:11px;color:var(--ink-muted);margin-bottom:28px;line-height:1.6;}
+.btn-google{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  width:100%;padding:12px 16px;background:#fff;border:none;border-radius:8px;
+  font-family:'DM Sans',sans-serif;font-size:14px;font-weight:600;color:#333;
+  cursor:pointer;transition:background .2s;
+}
+.btn-google:hover{background:#f0f0f0;}
+.btn-google svg{width:20px;height:20px;flex-shrink:0;}
+.login-badge{
+  margin-top:20px;font-size:9px;color:var(--ink-muted);
+  letter-spacing:.06em;text-transform:uppercase;
+}
+
+/* USER BAR */
+.user-bar{
+  display:flex;align-items:center;gap:8px;
+  padding:6px 10px;background:#1a2a3a;border-radius:20px;
+  font-size:11px;color:var(--paper);
+}
+.user-bar img{width:22px;height:22px;border-radius:50%;object-fit:cover;}
+.btn-logout{
+  background:transparent;border:none;color:var(--ink-muted);
+  font-size:10px;cursor:pointer;padding:2px 6px;border-radius:4px;
+  font-family:'DM Sans',sans-serif;
+}
+.btn-logout:hover{color:var(--accent);background:#243444;}
+
+/* APP SCREEN */
+#appScreen{display:none;}
+</style>
+:root {
+  --ink:#0f1923; --ink-soft:#3a4a5a; --ink-muted:#7a8fa0;
+  --paper:#f5f0e8; --paper-alt:#ede8de;
+  --accent:#b8390e; --accent-light:#f5e6e0;
+  --green:#1a6b3a; --green-light:#e0f0e8;
+  --blue:#1a4070; --blue-light:#e0eaf8;
+  --gold:#8a6a1a; --gold-light:#f5efd0;
+  --border:#c8bfaf;
+  --sidebar-bg:#0f1923;
+  --panel-bg:#162230;
+  --panel-border:#243444;
+}
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:'DM Sans',sans-serif;background:#c8c3b8;color:var(--ink);min-height:100vh;}
+
+/* ──── LAYOUT ──── */
+.app{display:grid;grid-template-columns:400px 1fr;min-height:100vh;}
+
+/* ──── SIDEBAR ──── */
+.sidebar{
+  background:var(--sidebar-bg);color:#d0c8be;
+  display:flex;flex-direction:column;
+  height:100vh;position:sticky;top:0;overflow:hidden;
+}
+.sidebar-top{
+  padding:20px 24px 16px;
+  border-bottom:1px solid var(--panel-border);
+  flex-shrink:0;
+}
+.sidebar-top h1{font-family:'DM Serif Display',serif;font-size:19px;color:var(--paper);line-height:1.2;}
+.badge{
+  display:inline-block;margin-top:6px;font-size:9px;font-weight:700;
+  letter-spacing:.1em;text-transform:uppercase;
+  background:var(--accent);color:#fff;padding:2px 7px;border-radius:3px;
+}
+
+/* Tabs */
+.tabs{display:flex;gap:2px;padding:10px 24px 0;flex-shrink:0;border-bottom:1px solid var(--panel-border);}
+.tab{
+  padding:8px 14px;font-size:11px;font-weight:600;letter-spacing:.04em;
+  border:none;background:transparent;color:var(--ink-muted);cursor:pointer;
+  border-bottom:2px solid transparent;transition:all .2s;border-radius:4px 4px 0 0;
+}
+.tab:hover{color:var(--paper);}
+.tab.active{color:var(--paper);border-bottom-color:var(--accent);background:var(--panel-bg);}
+
+/* Panels */
+.panel{display:none;flex-direction:column;flex:1;overflow:hidden;}
+.panel.active{display:flex;}
+.panel-scroll{flex:1;overflow-y:auto;padding:16px 24px 24px;}
+.panel-scroll::-webkit-scrollbar{width:4px;}
+.panel-scroll::-webkit-scrollbar-track{background:transparent;}
+.panel-scroll::-webkit-scrollbar-thumb{background:#2a3a4a;border-radius:4px;}
+
+/* ──── FORM ELEMENTS ──── */
+.fs-title{
+  font-size:9px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--ink-muted);margin-bottom:8px;padding-bottom:5px;
+  border-bottom:1px solid var(--panel-border);margin-top:14px;
+}
+.fs-title:first-child{margin-top:0;}
+label{display:block;font-size:10px;color:#90a0b0;margin-bottom:3px;margin-top:8px;}
+input,select{
+  width:100%;background:#1a2a3a;border:1px solid var(--panel-border);
+  border-radius:6px;color:var(--paper);padding:8px 10px;
+  font-family:'DM Mono',monospace;font-size:12px;outline:none;transition:border-color .2s;
+}
+input:focus,select:focus{border-color:var(--accent);}
+select option{background:#1a2a3a;}
+.r2{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.r3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:6px;}
+
+/* ──── BOTONES ──── */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  border:none;border-radius:7px;cursor:pointer;font-family:'DM Sans',sans-serif;
+  font-weight:600;transition:all .15s;
+}
+.btn-primary{background:var(--accent);color:#fff;padding:11px 16px;font-size:13px;width:100%;margin-top:12px;}
+.btn-primary:hover{background:#9a2e08;}
+.btn-secondary{background:transparent;border:1px solid var(--panel-border);color:#90a0b0;padding:9px 14px;font-size:12px;width:100%;margin-top:6px;}
+.btn-secondary:hover{border-color:#90a0b0;color:var(--paper);}
+.btn-sm{padding:5px 10px;font-size:11px;border-radius:5px;}
+.btn-edit{background:#1a3a5a;color:#80b0e0;}
+.btn-edit:hover{background:#1a4a7a;}
+.btn-del{background:#3a1a1a;color:#e08080;}
+.btn-del:hover{background:#5a1a1a;}
+.btn-sel{background:#1a3a2a;color:#80e0a0;}
+.btn-sel:hover{background:#1a4a3a;}
+.btn-gen{background:var(--green);color:#fff;padding:12px;font-size:13px;width:100%;margin-top:14px;}
+.btn-gen:hover{background:#145a30;}
+.btn-print{background:transparent;border:1px solid var(--panel-border);color:#90a0b0;padding:10px;font-size:12px;width:100%;margin-top:6px;}
+.btn-print:hover{border-color:#90a0b0;color:var(--paper);}
+
+/* ──── LISTAS ──── */
+.entity-list{display:flex;flex-direction:column;gap:6px;margin-top:8px;}
+.entity-card{
+  background:var(--panel-bg);border:1px solid var(--panel-border);
+  border-radius:8px;padding:10px 12px;
+  display:flex;justify-content:space-between;align-items:center;
+  transition:border-color .2s;
+}
+.entity-card:hover{border-color:#405060;}
+.entity-card.selected{border-color:var(--green);}
+.ec-info{}
+.ec-name{font-size:13px;font-weight:600;color:var(--paper);}
+.ec-sub{font-size:10px;color:var(--ink-muted);margin-top:2px;font-family:'DM Mono',monospace;}
+.ec-actions{display:flex;gap:5px;flex-shrink:0;}
+.empty-state{
+  text-align:center;padding:28px 16px;color:var(--ink-muted);font-size:12px;
+  background:var(--panel-bg);border:1px dashed var(--panel-border);border-radius:8px;
+  margin-top:8px;
+}
+.empty-state svg{opacity:.3;margin-bottom:8px;}
+
+/* Separador selección activa */
+.sel-info{
+  background:var(--panel-bg);border:1px solid var(--panel-border);
+  border-radius:8px;padding:10px 14px;margin-bottom:12px;
+  font-size:11px;color:var(--ink-muted);
+  display:flex;justify-content:space-between;align-items:center;
+}
+.sel-info strong{color:var(--paper);}
+.sel-badge{
+  font-size:9px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;
+  padding:2px 7px;border-radius:3px;
+}
+.sel-badge.ok{background:var(--green);color:#fff;}
+.sel-badge.warn{background:#5a4010;color:#f0c060;}
+
+/* Divider */
+.divider{height:1px;background:var(--panel-border);margin:14px 0;}
+
+/* ──── PREVIEW ──── */
+.preview{
+  background:#c0bbb0;padding:28px;
+  display:flex;flex-direction:column;align-items:center;overflow-y:auto;
+}
+.preview-label{
+  font-size:9px;letter-spacing:.12em;text-transform:uppercase;
+  color:#7a7060;margin-bottom:14px;align-self:flex-start;
+}
+
+/* ──── RECIBO ──── */
+.recibo{
+  background:var(--paper);width:100%;max-width:760px;
+  border-radius:4px;box-shadow:0 8px 40px rgba(0,0,0,.3);overflow:hidden;
+  font-family:'DM Sans',sans-serif;
+}
+.rec-header{
+  background:var(--ink);color:var(--paper);padding:18px 26px 16px;
+  display:flex;justify-content:space-between;align-items:flex-start;
+}
+.rec-empresa{font-family:'DM Serif Display',serif;font-size:20px;}
+.rec-empresa-sub{font-size:10px;color:#7a8fa0;margin-top:3px;font-family:'DM Mono',monospace;}
+.rec-titulo-bloque{text-align:right;}
+.rec-titulo{font-size:10px;letter-spacing:.1em;text-transform:uppercase;color:#7a8fa0;}
+.rec-periodo{font-family:'DM Serif Display',serif;font-size:18px;margin-top:2px;}
+.rec-ley{font-size:9px;color:var(--accent);font-family:'DM Mono',monospace;margin-top:4px;letter-spacing:.05em;}
+
+.sec-a{
+  background:var(--paper-alt);padding:14px 26px;
+  display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;
+  border-bottom:2px solid var(--border);
+}
+.dato-label{font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-muted);margin-bottom:2px;}
+.dato-valor{font-family:'DM Mono',monospace;font-size:12px;color:var(--ink);font-weight:500;}
+
+.sec-tag{
+  font-size:8px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;
+  padding:5px 26px 4px;display:flex;align-items:center;gap:8px;
+}
+.sec-tag::after{content:'';flex:1;height:1px;background:currentColor;opacity:.3;}
+.sec-tag.b{background:var(--blue-light);color:var(--blue);}
+.sec-tag.c{background:var(--green-light);color:var(--green);}
+.sec-tag.d{background:var(--gold-light);color:var(--gold);}
+
+.sec-b{padding:12px 26px 14px;border-bottom:2px solid var(--border);}
+.contrib-grid{display:grid;grid-template-columns:1fr 1fr;gap:4px 20px;margin-top:6px;}
+.contrib-row{display:flex;justify-content:space-between;align-items:center;padding:5px 0;border-bottom:1px dashed var(--border);font-size:12px;}
+.contrib-row:last-child{border-bottom:none;}
+.contrib-name{color:var(--ink-soft);}
+.contrib-pct{font-size:10px;color:var(--ink-muted);margin-left:3px;}
+.contrib-val{font-family:'DM Mono',monospace;font-weight:600;color:var(--blue);}
+.contrib-total{display:flex;justify-content:space-between;margin-top:8px;padding:7px 10px;background:var(--blue-light);border-radius:6px;font-size:13px;font-weight:600;color:var(--blue);}
+.costo-total-box{display:flex;justify-content:space-between;align-items:center;margin-top:8px;padding:9px 12px;background:var(--ink);color:var(--paper);border-radius:6px;}
+.costo-total-label{font-size:11px;text-transform:uppercase;letter-spacing:.05em;}
+.costo-total-val{font-family:'DM Mono',monospace;font-size:17px;font-weight:700;}
+
+.sec-c{padding:12px 26px 14px;border-bottom:2px solid var(--border);}
+.liquid-table{width:100%;border-collapse:collapse;margin-top:6px;font-size:12px;}
+.liquid-table th{text-align:left;font-size:9px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink-muted);padding:4px 6px;border-bottom:1px solid var(--border);}
+.liquid-table th:last-child,.liquid-table td:last-child{text-align:right;}
+.liquid-table td{padding:5px 6px;border-bottom:1px dashed var(--border);color:var(--ink-soft);}
+.liquid-table td.nm{color:var(--ink);}
+.liquid-table td.amt{font-family:'DM Mono',monospace;font-weight:500;}
+.liquid-table td.pos{color:var(--green);}
+.liquid-table td.neg{color:var(--accent);}
+.liquid-table tr.sub td{font-weight:700;background:var(--paper-alt);color:var(--ink);border-bottom:2px solid var(--border);}
+.neto-box{display:flex;justify-content:space-between;align-items:center;margin-top:10px;padding:11px 14px;background:var(--green-light);border:2px solid var(--green);border-radius:6px;}
+.neto-label{font-size:13px;font-weight:700;color:var(--green);}
+.neto-letras{font-size:10px;color:var(--green);margin-top:2px;font-style:italic;}
+.neto-val{font-family:'DM Mono',monospace;font-size:22px;font-weight:700;color:var(--green);}
+
+.sec-d{padding:12px 26px 18px;}
+.chart-area{display:flex;align-items:center;gap:24px;margin-top:8px;}
+.pie-wrap{position:relative;width:130px;height:130px;flex-shrink:0;}
+.legend{flex:1;}
+.legend-item{display:flex;align-items:center;gap:8px;margin-bottom:7px;font-size:12px;}
+.legend-dot{width:10px;height:10px;border-radius:2px;flex-shrink:0;}
+.legend-label{color:var(--ink-soft);flex:1;}
+.legend-pct{font-family:'DM Mono',monospace;font-weight:700;color:var(--ink);font-size:11px;}
+
+.rec-footer{
+  background:var(--paper-alt);border-top:2px solid var(--border);
+  padding:8px 26px;display:flex;justify-content:space-between;align-items:center;
+  font-size:9px;color:var(--ink-muted);font-family:'DM Mono',monospace;
+}
+
+.placeholder-big{
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  height:420px;color:#7a7060;text-align:center;
+}
+.placeholder-big p{font-size:14px;margin-top:16px;}
+.placeholder-big small{font-size:11px;margin-top:6px;opacity:.6;}
+
+/* ──── MODAL ──── */
+.modal-overlay{
+  position:fixed;inset:0;background:rgba(0,0,0,.6);z-index:1000;
+  display:none;align-items:center;justify-content:center;
+}
+.modal-overlay.open{display:flex;}
+.modal{
+  background:#1a2a3a;border:1px solid var(--panel-border);border-radius:12px;
+  padding:24px;width:min(480px,95vw);max-height:90vh;overflow-y:auto;
+  box-shadow:0 24px 60px rgba(0,0,0,.5);
+}
+.modal h2{font-family:'DM Serif Display',serif;font-size:18px;color:var(--paper);margin-bottom:4px;}
+.modal-sub{font-size:11px;color:var(--ink-muted);margin-bottom:16px;}
+.modal-actions{display:flex;gap:8px;margin-top:16px;}
+.modal-actions .btn{flex:1;}
+.btn-cancel{background:#243444;color:#90a0b0;}
+.btn-cancel:hover{background:#2a3a4a;}
+.btn-save{background:var(--accent);color:#fff;}
+.btn-save:hover{background:#9a2e08;}
+
+/* ──── TOAST ──── */
+.toast{
+  position:fixed;bottom:24px;right:24px;z-index:2000;
+  background:var(--green);color:#fff;padding:10px 18px;
+  border-radius:8px;font-size:13px;font-weight:600;
+  opacity:0;transform:translateY(8px);transition:all .3s;pointer-events:none;
+}
+.toast.show{opacity:1;transform:translateY(0);}
+.toast.error{background:var(--accent);}
+
+@media print{
+  body{background:#fff;}
+  .sidebar{display:none;}
+  .preview{padding:0;background:#fff;}
+  .preview-label{display:none;}
+  .app{grid-template-columns:1fr;}
+  .recibo{box-shadow:none;max-width:100%;}
+}
+</style>
+</head>
+<body>
+
+<!-- TOAST -->
+<div class="toast" id="toast"></div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modalOverlay">
+  <div class="modal" id="modalBox">
+    <!-- relleno dinámicamente -->
+  </div>
+</div>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <div class="login-logo">RS</div>
+    <div class="login-title">Recibo de Sueldo</div>
+    <div class="login-sub">Sistema de liquidación de haberes<br>Ley 27.802 · Dto. 407/2026</div>
+    <button class="btn-google" onclick="loginGoogle()">
+      <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+        <path d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" fill="#4285F4"/>
+        <path d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" fill="#34A853"/>
+        <path d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z" fill="#FBBC05"/>
+        <path d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" fill="#EA4335"/>
+      </svg>
+      Ingresar con Google
+    </button>
+    <div class="login-badge">Ley 27.802 · Dto. 407/2026 · LCT Art. 140</div>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="appScreen" class="app">
+
+<!-- ──── SIDEBAR ──── -->
+<aside class="sidebar">
+  <div class="sidebar-top">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+      <h1>Recibo de Sueldo</h1>
+      <div class="user-bar">
+        <img id="userAvatar" src="" alt="" style="display:none"/>
+        <span id="userInfo" style="font-size:10px;max-width:100px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;"></span>
+        <button class="btn-logout" onclick="logout()">Salir</button>
+      </div>
+    </div>
+    <span class="badge">Ley 27.802 · Dto. 407/2026</span>
+  </div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('empleadores')">Empleadores</button>
+    <button class="tab" onclick="switchTab('empleados')">Empleados</button>
+    <button class="tab" onclick="switchTab('recibo')">Liquidar</button>
+  </div>
+
+  <!-- ── TAB EMPLEADORES ── -->
+  <div class="panel active" id="tab-empleadores">
+    <div class="panel-scroll">
+      <div class="fs-title" style="margin-top:0">Empleadores registrados</div>
+      <button class="btn btn-primary" onclick="openModal('empleador')">+ Nuevo Empleador</button>
+      <div class="entity-list" id="listEmpleadores">
+        <div class="empty-state">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect x="4" y="4" width="24" height="24" rx="3" stroke="#7a8fa0" stroke-width="1.5"/><line x1="10" y1="12" x2="22" y2="12" stroke="#7a8fa0" stroke-width="1.5"/><line x1="10" y1="17" x2="22" y2="17" stroke="#7a8fa0" stroke-width="1.5"/></svg>
+          <div>No hay empleadores cargados</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB EMPLEADOS ── -->
+  <div class="panel" id="tab-empleados">
+    <div class="panel-scroll">
+      <div class="fs-title" style="margin-top:0">Empleador activo</div>
+      <div id="empActivo" class="sel-info">
+        <span>Ninguno seleccionado</span>
+        <span class="sel-badge warn">Sin selección</span>
+      </div>
+      <div class="fs-title">Empleados del empleador</div>
+      <button class="btn btn-primary" onclick="openModal('empleado')">+ Nuevo Empleado</button>
+      <div class="entity-list" id="listEmpleados">
+        <div class="empty-state">
+          <svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="11" r="5" stroke="#7a8fa0" stroke-width="1.5"/><path d="M6 26c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="#7a8fa0" stroke-width="1.5" stroke-linecap="round"/></svg>
+          <div>Seleccioná un empleador primero</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ── TAB RECIBO ── -->
+  <div class="panel" id="tab-recibo">
+    <div class="panel-scroll">
+      <div class="fs-title" style="margin-top:0">Selección</div>
+      <div id="recEmpActivo" class="sel-info">
+        <div><div style="font-size:9px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.06em;">Empleador</div><strong id="recEmpNombre">—</strong></div>
+        <span class="sel-badge warn" id="recEmpBadge">Sin selección</span>
+      </div>
+      <div id="recTrabActivo" class="sel-info">
+        <div><div style="font-size:9px;color:var(--ink-muted);text-transform:uppercase;letter-spacing:.06em;">Empleado</div><strong id="recTrabNombre">—</strong></div>
+        <span class="sel-badge warn" id="recTrabBadge">Sin selección</span>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="fs-title">Período y pago</div>
+      <label>Período</label>
+      <input id="r_periodo" type="month" value="2026-05"/>
+      <div class="r2">
+        <div>
+          <label>Fecha de pago</label>
+          <input id="r_fechapago" type="date" value="2026-05-30"/>
+        </div>
+        <div>
+          <label>Lugar de pago</label>
+          <input id="r_lugarpago" type="text" value="CABA"/>
+        </div>
+      </div>
+
+      <div class="fs-title">Conceptos remunerativos</div>
+      <label>Sueldo Básico ($)</label>
+      <input id="r_basico" type="number" value="850000"/>
+      <div class="r2">
+        <div><label>Antigüedad ($)</label><input id="r_ant" type="number" value="42500"/></div>
+        <div><label>Presentismo ($)</label><input id="r_pres" type="number" value="25500"/></div>
+      </div>
+      <label>Horas Extra ($)</label>
+      <input id="r_hextra" type="number" value="0"/>
+      <label>No Remunerativo ($)</label>
+      <input id="r_norem" type="number" value="30000"/>
+
+      <div class="fs-title">Contribuciones patronales</div>
+      <div class="r3">
+        <div><label>Jub. (%)</label><input id="r_jub_pat" type="number" value="18" step=".01"/></div>
+        <div><label>O. Social (%)</label><input id="r_os_pat" type="number" value="6" step=".01"/></div>
+        <div><label>ART (%)</label><input id="r_art" type="number" value="3" step=".01"/></div>
+      </div>
+      <div class="r2">
+        <div><label>PAMI pat. (%)</label><input id="r_pami_pat" type="number" value="1.5" step=".01"/></div>
+        <div><label>Asig. Fam. (%)</label><input id="r_af" type="number" value="4.44" step=".01"/></div>
+      </div>
+      <label>Aporte Sindical Patronal ($)</label>
+      <input id="r_sind_pat" type="number" value="5000"/>
+
+      <div class="fs-title">Aportes personales</div>
+      <div class="r3">
+        <div><label>Jub. (%)</label><input id="r_jub" type="number" value="11" step=".01"/></div>
+        <div><label>O. Social (%)</label><input id="r_os" type="number" value="3" step=".01"/></div>
+        <div><label>PAMI (%)</label><input id="r_pami" type="number" value="3" step=".01"/></div>
+      </div>
+      <label>Cuota Sindical (%)</label>
+      <input id="r_sind" type="number" value="2" step=".01"/>
+      <label>Otros descuentos ($)</label>
+      <input id="r_otros" type="number" value="0"/>
+
+      <button class="btn btn-gen" onclick="generarRecibo()">▶ Generar Recibo</button>
+      <button class="btn btn-print" onclick="window.print()">Imprimir / Guardar PDF</button>
+    </div>
+  </div>
+</aside>
+
+<!-- ──── PREVIEW ──── -->
+<main class="preview" id="preview">
+  <div class="preview-label">Vista previa · Dto. 407/2026</div>
+  <div class="placeholder-big">
+    <svg width="64" height="64" viewBox="0 0 64 64" fill="none"><rect x="8" y="6" width="48" height="52" rx="4" stroke="#7a7060" stroke-width="2"/><line x1="18" y1="22" x2="46" y2="22" stroke="#7a7060" stroke-width="2"/><line x1="18" y1="30" x2="46" y2="30" stroke="#7a7060" stroke-width="2"/><line x1="18" y1="38" x2="36" y2="38" stroke="#7a7060" stroke-width="2"/></svg>
+    <p>Cargá un empleador, luego un empleado<br>y generá el recibo en la pestaña <strong>Liquidar</strong></p>
+    <small>Formato obligatorio · Ley 27.802 · Dto. 407/2026 · LCT Art. 140</small>
+  </div>
+</main>
+
+</div><!-- .app -->
+</div><!-- #appScreen -->
+
+<script>
+// ════════════════════════════════════════════
+//  FIREBASE DB
+// ════════════════════════════════════════════
+let DB = { empleadores: [], empleados: [] };
+let selectedEmpleadorId = null;
+let selectedEmpleadoId  = null;
+let myChart = null;
+
+async function loadDB() {
+  if (!userDoc) return;
+  try {
+    const snap = await userDoc.get();
+    if (snap.exists()) DB = snap.data();
+    else DB = { empleadores: [], empleados: [] };
+  } catch(e) { console.error('Error cargando datos:', e); }
+  renderAll();
+}
+
+async function saveDB() {
+  if (!userDoc) return;
+  try { await userDoc.set(DB); }
+  catch(e) { console.error('Error guardando:', e); }
+}
+
+// ════════════════════════════════════════════
+//  TABS
+// ════════════════════════════════════════════
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i) => {
+    const names = ['empleadores','empleados','recibo'];
+    t.classList.toggle('active', names[i] === name);
+  });
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+}
+
+// ════════════════════════════════════════════
+//  RENDER
+// ════════════════════════════════════════════
+function renderAll() {
+  renderEmpleadores();
+  renderEmpleados();
+  renderSeleccionRecibo();
+}
+
+function renderEmpleadores() {
+  const list = document.getElementById('listEmpleadores');
+  if (!DB.empleadores.length) {
+    list.innerHTML = `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 32 32" fill="none"><rect x="4" y="4" width="24" height="24" rx="3" stroke="#7a8fa0" stroke-width="1.5"/><line x1="10" y1="12" x2="22" y2="12" stroke="#7a8fa0" stroke-width="1.5"/><line x1="10" y1="17" x2="22" y2="17" stroke="#7a8fa0" stroke-width="1.5"/></svg><div>No hay empleadores cargados</div></div>`;
+    return;
+  }
+  list.innerHTML = DB.empleadores.map(e => `
+    <div class="entity-card ${selectedEmpleadorId===e.id?'selected':''}">
+      <div class="ec-info">
+        <div class="ec-name">${esc(e.razonSocial)}</div>
+        <div class="ec-sub">CUIT ${esc(e.cuit)} · ${esc(e.actividad||'')}</div>
+      </div>
+      <div class="ec-actions">
+        <button class="btn btn-sm btn-sel" onclick="seleccionarEmpleador('${e.id}')">✓</button>
+        <button class="btn btn-sm btn-edit" onclick="openModal('empleador','${e.id}')">✎</button>
+        <button class="btn btn-sm btn-del" onclick="eliminar('empleador','${e.id}')">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderEmpleados() {
+  const list = document.getElementById('listEmpleados');
+  const emp = DB.empleadores.find(e => e.id === selectedEmpleadorId);
+
+  // cabecera empleador activo
+  const actDiv = document.getElementById('empActivo');
+  if (emp) {
+    actDiv.innerHTML = `<span><strong>${esc(emp.razonSocial)}</strong></span><span class="sel-badge ok">Activo</span>`;
+  } else {
+    actDiv.innerHTML = `<span>Ninguno seleccionado</span><span class="sel-badge warn">Sin selección</span>`;
+  }
+
+  if (!emp) {
+    list.innerHTML = `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="11" r="5" stroke="#7a8fa0" stroke-width="1.5"/><path d="M6 26c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="#7a8fa0" stroke-width="1.5" stroke-linecap="round"/></svg><div>Seleccioná un empleador primero</div></div>`;
+    return;
+  }
+
+  const empleados = DB.empleados.filter(e => e.empleadorId === selectedEmpleadorId);
+  if (!empleados.length) {
+    list.innerHTML = `<div class="empty-state"><svg width="32" height="32" viewBox="0 0 32 32" fill="none"><circle cx="16" cy="11" r="5" stroke="#7a8fa0" stroke-width="1.5"/><path d="M6 26c0-5.523 4.477-10 10-10s10 4.477 10 10" stroke="#7a8fa0" stroke-width="1.5" stroke-linecap="round"/></svg><div>No hay empleados en este empleador</div></div>`;
+    return;
+  }
+  list.innerHTML = empleados.map(e => `
+    <div class="entity-card ${selectedEmpleadoId===e.id?'selected':''}">
+      <div class="ec-info">
+        <div class="ec-name">${esc(e.apellidoNombre)}</div>
+        <div class="ec-sub">CUIL ${esc(e.cuil)} · ${esc(e.categoria||'')}</div>
+      </div>
+      <div class="ec-actions">
+        <button class="btn btn-sm btn-sel" onclick="seleccionarEmpleado('${e.id}')">✓</button>
+        <button class="btn btn-sm btn-edit" onclick="openModal('empleado','${e.id}')">✎</button>
+        <button class="btn btn-sm btn-del" onclick="eliminar('empleado','${e.id}')">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+function renderSeleccionRecibo() {
+  const emp  = DB.empleadores.find(e => e.id === selectedEmpleadorId);
+  const trab = DB.empleados.find(e => e.id === selectedEmpleadoId);
+
+  document.getElementById('recEmpNombre').textContent = emp  ? emp.razonSocial   : '—';
+  document.getElementById('recTrabNombre').textContent= trab ? trab.apellidoNombre: '—';
+
+  const b1 = document.getElementById('recEmpBadge');
+  const b2 = document.getElementById('recTrabBadge');
+  b1.textContent = emp  ? 'Activo' : 'Sin selección';
+  b1.className   = 'sel-badge ' + (emp  ? 'ok' : 'warn');
+  b2.textContent = trab ? 'Activo' : 'Sin selección';
+  b2.className   = 'sel-badge ' + (trab ? 'ok' : 'warn');
+}
+
+// ════════════════════════════════════════════
+//  SELECCIÓN
+// ════════════════════════════════════════════
+function seleccionarEmpleador(id) {
+  selectedEmpleadorId = id;
+  selectedEmpleadoId  = null; // resetear empleado al cambiar empleador
+  const emp = DB.empleadores.find(e => e.id === id);
+  if (emp) {
+    // Pre-llenar datos del empleador en el form recibo
+    document.getElementById('r_lugarpago').value = emp.ciudad || 'CABA';
+  }
+  renderAll();
+  toast('Empleador seleccionado ✓');
+  switchTab('empleados');
+}
+
+function seleccionarEmpleado(id) {
+  selectedEmpleadoId = id;
+  const trab = DB.empleados.find(e => e.id === id);
+  if (trab) {
+    // Pre-llenar datos del empleado en el form recibo
+    if (trab.basico)    document.getElementById('r_basico').value = trab.basico;
+    if (trab.ant)       document.getElementById('r_ant').value    = trab.ant;
+    if (trab.pres)      document.getElementById('r_pres').value   = trab.pres;
+    if (trab.cct)       {} // no hay campo directo, se usa internamente
+  }
+  renderAll();
+  toast('Empleado seleccionado ✓');
+  switchTab('recibo');
+}
+
+// ════════════════════════════════════════════
+//  ELIMINAR
+// ════════════════════════════════════════════
+function eliminar(tipo, id) {
+  const nombre = tipo === 'empleador'
+    ? DB.empleadores.find(e=>e.id===id)?.razonSocial
+    : DB.empleados.find(e=>e.id===id)?.apellidoNombre;
+  if (!confirm(`¿Eliminar "${nombre}"?`)) return;
+  if (tipo === 'empleador') {
+    DB.empleadores = DB.empleadores.filter(e => e.id !== id);
+    DB.empleados   = DB.empleados.filter(e => e.empleadorId !== id); // en cascada
+    if (selectedEmpleadorId === id) { selectedEmpleadorId = null; selectedEmpleadoId = null; }
+  } else {
+    DB.empleados = DB.empleados.filter(e => e.id !== id);
+    if (selectedEmpleadoId === id) selectedEmpleadoId = null;
+  }
+  saveDB();
+  renderAll();
+  toast('Eliminado', true);
+}
+
+// ════════════════════════════════════════════
+//  MODAL ABM
+// ════════════════════════════════════════════
+function openModal(tipo, id = null) {
+  if (tipo === 'empleado' && !selectedEmpleadorId) {
+    toast('Primero seleccioná un empleador', true);
+    switchTab('empleadores');
+    return;
+  }
+  const overlay = document.getElementById('modalOverlay');
+  const box     = document.getElementById('modalBox');
+  const isEdit  = !!id;
+
+  let data = {};
+  if (isEdit && tipo === 'empleador') data = DB.empleadores.find(e=>e.id===id)||{};
+  if (isEdit && tipo === 'empleado')  data = DB.empleados.find(e=>e.id===id)||{};
+
+  if (tipo === 'empleador') {
+    box.innerHTML = `
+      <h2>${isEdit?'Modificar':'Nuevo'} Empleador</h2>
+      <div class="modal-sub">Datos del empleador · Art. 140 LCT</div>
+      <label>Razón Social *</label>
+      <input id="m_razon" type="text" value="${esc(data.razonSocial||'')}" placeholder="Empresa S.A."/>
+      <label>CUIT *</label>
+      <input id="m_cuit" type="text" value="${esc(data.cuit||'')}" placeholder="30-12345678-9"/>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><label>Actividad / Rubro</label><input id="m_actividad" type="text" value="${esc(data.actividad||'')}" placeholder="Comercio"/></div>
+        <div><label>Ciudad</label><input id="m_ciudad" type="text" value="${esc(data.ciudad||'')}" placeholder="CABA"/></div>
+      </div>
+      <label>Domicilio</label>
+      <input id="m_domicilio" type="text" value="${esc(data.domicilio||'')}" placeholder="Av. Corrientes 1234"/>
+      <label>Convenio Colectivo (CCT)</label>
+      <input id="m_cct" type="text" value="${esc(data.cct||'')}" placeholder="CCT 130/75 Empleados de Comercio"/>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-save" onclick="guardarEmpleador('${id||''}')">Guardar</button>
+      </div>`;
+  } else {
+    box.innerHTML = `
+      <h2>${isEdit?'Modificar':'Nuevo'} Empleado</h2>
+      <div class="modal-sub">Datos del trabajador · Art. 140 LCT</div>
+      <label>Apellido y Nombre *</label>
+      <input id="m_nombre" type="text" value="${esc(data.apellidoNombre||'')}" placeholder="García, María Elena"/>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><label>CUIL *</label><input id="m_cuil" type="text" value="${esc(data.cuil||'')}" placeholder="27-12345678-9"/></div>
+        <div><label>Legajo N°</label><input id="m_legajo" type="text" value="${esc(data.legajo||'')}" placeholder="00142"/></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><label>Fecha de Ingreso</label><input id="m_ingreso" type="date" value="${data.ingreso||''}"/></div>
+        <div><label>Categoría / Puesto</label><input id="m_categoria" type="text" value="${esc(data.categoria||'')}" placeholder="Analista Jr."/></div>
+      </div>
+      <label>Sueldo Básico habitual ($)</label>
+      <input id="m_basico" type="number" value="${data.basico||''}" placeholder="850000"/>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+        <div><label>Adicional Antigüedad ($)</label><input id="m_ant" type="number" value="${data.ant||0}"/></div>
+        <div><label>Adicional Presentismo ($)</label><input id="m_pres" type="number" value="${data.pres||0}"/></div>
+      </div>
+      <label>Cuenta bancaria / CBU</label>
+      <input id="m_cbu" type="text" value="${esc(data.cbu||'')}" placeholder="0720000088000012345678"/>
+      <div class="modal-actions">
+        <button class="btn btn-cancel" onclick="closeModal()">Cancelar</button>
+        <button class="btn btn-save" onclick="guardarEmpleado('${id||''}')">Guardar</button>
+      </div>`;
+  }
+  overlay.classList.add('open');
+}
+
+function closeModal() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function guardarEmpleador(id) {
+  const razon = document.getElementById('m_razon').value.trim();
+  const cuit  = document.getElementById('m_cuit').value.trim();
+  if (!razon || !cuit) { toast('Razón Social y CUIT son obligatorios', true); return; }
+
+  const obj = {
+    id: id || uid(),
+    razonSocial: razon,
+    cuit,
+    actividad: document.getElementById('m_actividad').value.trim(),
+    ciudad:    document.getElementById('m_ciudad').value.trim(),
+    domicilio: document.getElementById('m_domicilio').value.trim(),
+    cct:       document.getElementById('m_cct').value.trim(),
+  };
+
+  if (id) {
+    const idx = DB.empleadores.findIndex(e=>e.id===id);
+    DB.empleadores[idx] = obj;
+  } else {
+    DB.empleadores.push(obj);
+  }
+  saveDB(); renderAll(); closeModal();
+  toast(id ? 'Empleador actualizado ✓' : 'Empleador guardado ✓');
+}
+
+function guardarEmpleado(id) {
+  const nombre = document.getElementById('m_nombre').value.trim();
+  const cuil   = document.getElementById('m_cuil').value.trim();
+  if (!nombre || !cuil) { toast('Nombre y CUIL son obligatorios', true); return; }
+
+  const obj = {
+    id: id || uid(),
+    empleadorId: selectedEmpleadorId,
+    apellidoNombre: nombre,
+    cuil,
+    legajo:   document.getElementById('m_legajo').value.trim(),
+    ingreso:  document.getElementById('m_ingreso').value,
+    categoria:document.getElementById('m_categoria').value.trim(),
+    basico:   parseFloat(document.getElementById('m_basico').value)||0,
+    ant:      parseFloat(document.getElementById('m_ant').value)||0,
+    pres:     parseFloat(document.getElementById('m_pres').value)||0,
+    cbu:      document.getElementById('m_cbu').value.trim(),
+  };
+
+  if (id) {
+    const idx = DB.empleados.findIndex(e=>e.id===id);
+    DB.empleados[idx] = obj;
+  } else {
+    DB.empleados.push(obj);
+  }
+  saveDB(); renderAll(); closeModal();
+  toast(id ? 'Empleado actualizado ✓' : 'Empleado guardado ✓');
+}
+
+// ════════════════════════════════════════════
+//  GENERAR RECIBO
+// ════════════════════════════════════════════
+const fmtARS = n => n.toLocaleString('es-AR',{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtPct = v => parseFloat(v)||0;
+
+function calcAnt(fechaIngreso) {
+  if (!fechaIngreso) return '0 años';
+  const hoy = new Date(), ing = new Date(fechaIngreso);
+  let y = hoy.getFullYear()-ing.getFullYear();
+  if (hoy.getMonth()<ing.getMonth()||(hoy.getMonth()===ing.getMonth()&&hoy.getDate()<ing.getDate())) y--;
+  return y + (y===1?' año':' años');
+}
+
+function periodoLabel(v) {
+  if (!v) return '';
+  const [y,m] = v.split('-');
+  const ms=['Enero','Febrero','Marzo','Abril','Mayo','Junio','Julio','Agosto','Septiembre','Octubre','Noviembre','Diciembre'];
+  return ms[parseInt(m)-1]+' '+y;
+}
+
+function generarRecibo() {
+  const emp  = DB.empleadores.find(e=>e.id===selectedEmpleadorId);
+  const trab = DB.empleados.find(e=>e.id===selectedEmpleadoId);
+  if (!emp)  { toast('Seleccioná un empleador primero', true); switchTab('empleadores'); return; }
+  if (!trab) { toast('Seleccioná un empleado primero', true); switchTab('empleados'); return; }
+
+  // Valores del formulario
+  const g = id => document.getElementById(id);
+  const periodo   = g('r_periodo').value;
+  const fechapago = g('r_fechapago').value;
+  const lugarpago = g('r_lugarpago').value;
+
+  const basico   = parseFloat(g('r_basico').value)||0;
+  const adicAnt  = parseFloat(g('r_ant').value)||0;
+  const adicPres = parseFloat(g('r_pres').value)||0;
+  const hextra   = parseFloat(g('r_hextra').value)||0;
+  const noRem    = parseFloat(g('r_norem').value)||0;
+  const bruto    = basico + adicAnt + adicPres + hextra;
+
+  const pJubPat = fmtPct(g('r_jub_pat').value)/100;
+  const pOsPat  = fmtPct(g('r_os_pat').value)/100;
+  const pArt    = fmtPct(g('r_art').value)/100;
+  const pPamiP  = fmtPct(g('r_pami_pat').value)/100;
+  const pAf     = fmtPct(g('r_af').value)/100;
+  const sindPat = parseFloat(g('r_sind_pat').value)||0;
+
+  const jubPat  = bruto*pJubPat;
+  const osPat   = bruto*pOsPat;
+  const artVal  = bruto*pArt;
+  const pamiPat = bruto*pPamiP;
+  const afVal   = bruto*pAf;
+  const totContrib = jubPat+osPat+artVal+pamiPat+afVal+sindPat;
+  const costoTotal = bruto+totContrib;
+
+  const pJub  = fmtPct(g('r_jub').value)/100;
+  const pOs   = fmtPct(g('r_os').value)/100;
+  const pPami = fmtPct(g('r_pami').value)/100;
+  const pSind = fmtPct(g('r_sind').value)/100;
+  const otros = parseFloat(g('r_otros').value)||0;
+
+  const jubPers  = bruto*pJub;
+  const osPers   = bruto*pOs;
+  const pamiPers = bruto*pPami;
+  const sindPers = bruto*pSind;
+  const totAp    = jubPers+osPers+pamiPers+sindPers+otros;
+  const neto     = bruto+noRem-totAp;
+
+  let fechaFmt = '';
+  if (fechapago) {
+    const d = new Date(fechapago+'T12:00:00');
+    fechaFmt = d.toLocaleDateString('es-AR',{day:'2-digit',month:'long',year:'numeric'});
+  }
+
+  const optRow = (cond, nm, tipo, cls, prefix, val) =>
+    cond ? `<tr><td class="nm">${nm}</td><td>${tipo}</td><td class="amt ${cls}">${prefix}$ ${fmtARS(val)}</td></tr>` : '';
+
+  const html = `
+  <div class="recibo">
+    <div class="rec-header">
+      <div>
+        <div class="rec-empresa">${esc(emp.razonSocial)}</div>
+        <div class="rec-empresa-sub">CUIT ${esc(emp.cuit)}${emp.domicilio?' · '+esc(emp.domicilio):''}</div>
+      </div>
+      <div class="rec-titulo-bloque">
+        <div class="rec-titulo">Recibo de Haberes</div>
+        <div class="rec-periodo">${periodoLabel(periodo)}</div>
+        <div class="rec-ley">Ley 27.802 · Dto. 407/2026 · LCT Art. 140</div>
+      </div>
+    </div>
+
+    <div class="sec-a">
+      <div>
+        <div class="dato-label">Trabajador / CUIL</div>
+        <div class="dato-valor">${esc(trab.apellidoNombre)}</div>
+        <div class="dato-valor" style="font-size:10px;color:var(--ink-muted)">${esc(trab.cuil)}</div>
+      </div>
+      <div>
+        <div class="dato-label">Legajo · Categoría</div>
+        <div class="dato-valor">Nº ${esc(trab.legajo||'—')}</div>
+        <div class="dato-valor" style="font-size:10px;color:var(--ink-muted)">${esc(trab.categoria||'')}</div>
+      </div>
+      <div>
+        <div class="dato-label">Ingreso · Antigüedad</div>
+        <div class="dato-valor">${trab.ingreso?new Date(trab.ingreso+'T12:00:00').toLocaleDateString('es-AR'):'—'}</div>
+        <div class="dato-valor" style="font-size:10px;color:var(--ink-muted)">${calcAnt(trab.ingreso)}</div>
+      </div>
+      <div style="grid-column:span 2">
+        <div class="dato-label">Convenio Colectivo</div>
+        <div class="dato-valor">${esc(emp.cct||'—')}</div>
+      </div>
+      <div>
+        <div class="dato-label">Fecha y lugar de pago</div>
+        <div class="dato-valor" style="font-size:11px">${fechaFmt}</div>
+        <div class="dato-valor" style="font-size:10px;color:var(--ink-muted)">${esc(lugarpago)}</div>
+      </div>
+    </div>
+
+    <div class="sec-tag b">Sección B · Contribuciones Patronales a cargo del Empleador</div>
+    <div class="sec-b">
+      <div class="contrib-grid">
+        <div class="contrib-row"><span class="contrib-name">Jubilación <span class="contrib-pct">(${g('r_jub_pat').value}%)</span></span><span class="contrib-val">$ ${fmtARS(jubPat)}</span></div>
+        <div class="contrib-row"><span class="contrib-name">Obra Social <span class="contrib-pct">(${g('r_os_pat').value}%)</span></span><span class="contrib-val">$ ${fmtARS(osPat)}</span></div>
+        <div class="contrib-row"><span class="contrib-name">ART <span class="contrib-pct">(${g('r_art').value}%)</span></span><span class="contrib-val">$ ${fmtARS(artVal)}</span></div>
+        <div class="contrib-row"><span class="contrib-name">PAMI/INSSJP <span class="contrib-pct">(${g('r_pami_pat').value}%)</span></span><span class="contrib-val">$ ${fmtARS(pamiPat)}</span></div>
+        <div class="contrib-row"><span class="contrib-name">Asig. Familiares <span class="contrib-pct">(${g('r_af').value}%)</span></span><span class="contrib-val">$ ${fmtARS(afVal)}</span></div>
+        <div class="contrib-row"><span class="contrib-name">Aporte Sindical Patronal</span><span class="contrib-val">$ ${fmtARS(sindPat)}</span></div>
+      </div>
+      <div class="contrib-total"><span>Total contribuciones patronales</span><span>$ ${fmtARS(totContrib)}</span></div>
+      <div class="costo-total-box">
+        <span class="costo-total-label">Costo Total del Empleador (Bruto + Contribuciones)</span>
+        <span class="costo-total-val">$ ${fmtARS(costoTotal)}</span>
+      </div>
+    </div>
+
+    <div class="sec-tag c">Sección C · Liquidación Salarial del Trabajador</div>
+    <div class="sec-c">
+      <table class="liquid-table">
+        <thead><tr><th style="width:50%">Concepto</th><th>Tipo</th><th>Importe</th></tr></thead>
+        <tbody>
+          <tr><td class="nm">Sueldo Básico</td><td>Remunerativo</td><td class="amt pos">$ ${fmtARS(basico)}</td></tr>
+          ${optRow(adicAnt>0,'Adicional Antigüedad','Remunerativo','pos','',adicAnt)}
+          ${optRow(adicPres>0,'Adicional Presentismo','Remunerativo','pos','',adicPres)}
+          ${optRow(hextra>0,'Horas Extra','Remunerativo','pos','',hextra)}
+          ${optRow(noRem>0,'Concepto No Remunerativo','No Remunerativo','pos','',noRem)}
+          <tr class="sub"><td class="nm">Remuneración Bruta</td><td></td><td class="amt">$ ${fmtARS(bruto)}</td></tr>
+          <tr><td class="nm">Aporte Jubilatorio (${g('r_jub').value}%)</td><td>Descuento</td><td class="amt neg">- $ ${fmtARS(jubPers)}</td></tr>
+          <tr><td class="nm">Obra Social (${g('r_os').value}%)</td><td>Descuento</td><td class="amt neg">- $ ${fmtARS(osPers)}</td></tr>
+          <tr><td class="nm">PAMI/INSSJP (${g('r_pami').value}%)</td><td>Descuento</td><td class="amt neg">- $ ${fmtARS(pamiPers)}</td></tr>
+          <tr><td class="nm">Cuota Sindical (${g('r_sind').value}%)</td><td>Descuento</td><td class="amt neg">- $ ${fmtARS(sindPers)}</td></tr>
+          ${optRow(otros>0,'Otros descuentos','Descuento','neg','- ',otros)}
+          <tr class="sub"><td class="nm">Total Descuentos</td><td></td><td class="amt neg">- $ ${fmtARS(totAp)}</td></tr>
+        </tbody>
+      </table>
+      <div class="neto-box">
+        <div>
+          <div class="neto-label">SUELDO NETO A PERCIBIR</div>
+          <div class="neto-letras">PESOS ${fmtARS(neto)}</div>
+        </div>
+        <div class="neto-val">$ ${fmtARS(neto)}</div>
+      </div>
+    </div>
+
+    <div class="sec-tag d">Sección D · Composición del Costo Laboral Total (Obligatorio · Art. 140 LCT)</div>
+    <div class="sec-d">
+      <div class="chart-area">
+        <div class="pie-wrap"><canvas id="pieChart" width="130" height="130"></canvas></div>
+        <div class="legend">
+          <div class="legend-item"><div class="legend-dot" style="background:#1a6b3a"></div><span class="legend-label">Sueldo Neto</span><span class="legend-pct">${((neto/costoTotal)*100).toFixed(1)}%</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#b8390e"></div><span class="legend-label">Aportes Personales</span><span class="legend-pct">${((totAp/costoTotal)*100).toFixed(1)}%</span></div>
+          <div class="legend-item"><div class="legend-dot" style="background:#1a4070"></div><span class="legend-label">Contribuciones Patronales</span><span class="legend-pct">${((totContrib/costoTotal)*100).toFixed(1)}%</span></div>
+          ${noRem>0?`<div class="legend-item"><div class="legend-dot" style="background:#8a6a1a"></div><span class="legend-label">No Remunerativos</span><span class="legend-pct">${((noRem/costoTotal)*100).toFixed(1)}%</span></div>`:''}
+          <div style="margin-top:10px;padding-top:8px;border-top:1px solid var(--border);font-size:11px;color:var(--ink-muted)">
+            Costo Total: <strong style="color:var(--ink)">$ ${fmtARS(costoTotal)}</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="rec-footer">
+      <span>Pago acreditado en cuenta bancaria · LCT Art. 124${trab.cbu?' · CBU '+esc(trab.cbu):''}</span>
+      <span>Dto. 407/2026 · sin firma requerida</span>
+    </div>
+  </div>`;
+
+  const preview = document.getElementById('preview');
+  preview.innerHTML = `<div class="preview-label">Vista previa · Dto. 407/2026</div>${html}`;
+
+  setTimeout(() => {
+    const ctx = document.getElementById('pieChart');
+    if (!ctx) return;
+    if (myChart) myChart.destroy();
+    const data   = [neto, totAp, totContrib];
+    const colors = ['#1a6b3a','#b8390e','#1a4070'];
+    const labels = ['Neto','Aportes','Contrib.'];
+    if (noRem>0) { data.push(noRem); colors.push('#8a6a1a'); labels.push('No Rem.'); }
+    myChart = new Chart(ctx, {
+      type:'doughnut',
+      data:{ labels, datasets:[{ data, backgroundColor:colors, borderWidth:0, hoverOffset:6 }] },
+      options:{ responsive:false, cutout:'60%', plugins:{ legend:{display:false} } }
+    });
+  }, 80);
+}
+
+// ════════════════════════════════════════════
+//  UTILS
+// ════════════════════════════════════════════
+function uid() { return Date.now().toString(36)+Math.random().toString(36).slice(2,6); }
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+let toastTimer;
+function toast(msg, error=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast show' + (error?' error':'');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.className='toast', 2800);
+}
+
+// Cerrar modal clickando fuera
+document.getElementById('modalOverlay').addEventListener('click', e => {
+  if (e.target === document.getElementById('modalOverlay')) closeModal();
+});
+
+// ════════════════════════════════════════════
+//  INIT
+// ════════════════════════════════════════════
+loadDB();
+</script>
+</body>
+</html>
